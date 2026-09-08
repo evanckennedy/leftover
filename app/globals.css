@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #111412;
+  --foreground: #f2f4ef;
 }
 
 @theme inline {
@@ -12,15 +12,222 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.surface {
+  border: 1px solid #29372c;
+  border-radius: 1.25rem;
+  background: #151c17;
+}
+
+.icon-button,
+.row-action {
+  display: grid;
+  place-items: center;
+  border: 1px solid #304036;
+  border-radius: 0.7rem;
+  color: #89958a;
+  transition:
+    border-color 150ms,
+    color 150ms,
+    background 150ms;
+}
+
+.icon-button {
+  height: 2.25rem;
+  width: 2.25rem;
+}
+
+.icon-button:hover,
+.row-action:hover {
+  border-color: #6c8569;
+  background: #202d21;
+  color: #d4f58b;
+}
+
+.row-action {
+  height: 1.8rem;
+  width: 1.8rem;
+  border-color: transparent;
+}
+
+.row-action.danger:hover {
+  color: #ff9b82;
+}
+
+.money-display {
+  font-size: clamp(2.7rem, 7vw, 4.7rem);
+  font-weight: 650;
+  letter-spacing: -0.07em;
+  line-height: 1;
+}
+
+.eyebrow {
+  color: #8d9890;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-heading {
+  margin-top: 0.25rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.section-mark {
+  display: grid;
+  height: 2rem;
+  width: 2rem;
+  place-items: center;
+  border-radius: 0.7rem;
+}
+
+.section-mark span {
+  height: 0.45rem;
+  width: 0.45rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+.section-mark.green {
+  color: #c6f26d;
+  background: #263725;
+}
+.section-mark.orange {
+  color: #ffae91;
+  background: #3b2c25;
+}
+.section-mark.blue {
+  color: #9bd9d0;
+  background: #203735;
+}
+
+.add-button,
+.primary-button,
+.secondary-button,
+.danger-button {
+  display: inline-flex;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 0.7rem;
+  padding: 0 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition:
+    background 150ms,
+    color 150ms,
+    border-color 150ms,
+    opacity 150ms;
+}
+
+.add-button {
+  width: 100%;
+  border: 1px solid #364738;
+  color: #b8c8af;
+}
+.add-button:hover {
+  border-color: #7b9a6d;
+  background: #202d21;
+  color: #d4f58b;
+}
+.primary-button {
+  background: #c6f26d;
+  color: #162016;
+}
+.primary-button:hover {
+  background: #d7fb8d;
+}
+.primary-button:disabled {
+  opacity: 0.35;
+}
+.secondary-button {
+  border: 1px solid #3a493d;
+  color: #aab7aa;
+}
+.secondary-button:hover {
+  background: #202d21;
+  color: #f2f4ef;
+}
+.danger-button {
+  background: #c9674d;
+  color: #fff5f0;
+}
+.danger-button:hover {
+  background: #dd765a;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgb(4 7 5 / 75%);
+  padding: 1.25rem;
+  backdrop-filter: blur(5px);
+}
+.modal-panel {
+  width: min(100%, 31rem);
+  border: 1px solid #3a4a3d;
+  border-radius: 1.25rem;
+  background: #182019;
+  padding: 1.5rem;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 35%);
+}
+.field-label {
+  display: block;
+  color: #aeb9ad;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.field-input {
+  margin-top: 0.45rem;
+  width: 100%;
+  border: 1px solid #3a4a3d;
+  border-radius: 0.7rem;
+  background: #111712;
+  padding: 0.7rem 0.8rem;
+  color: #f2f4ef;
+  outline: none;
+}
+.field-input:focus {
+  border-color: #9abf68;
+  box-shadow: 0 0 0 3px rgb(198 242 109 / 10%);
+}
+.field-input::placeholder {
+  color: #5e6b61;
+}
+.field-input option {
+  background: #182019;
+}
+
+@media (max-width: 420px) {
+  .money-display {
+    font-size: 2.55rem;
+  }
+  .modal-panel {
+    padding: 1.25rem;
+  }
 }
