@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   Check,
   ChevronDown,
-  CircleDollarSign,
   Pencil,
   Plus,
   RotateCcw,
@@ -247,10 +246,6 @@ export default function Home() {
                     ? "Your recurring commitments are above your income."
                     : "Available for the things that make life a little more yours."}
                 </p>
-              </div>
-              <div className="flex items-center gap-2 rounded-full border border-[#40513e] bg-[#202d21] px-3 py-1.5 text-xs text-[#b6c7ad]">
-                <CircleDollarSign size={14} className="text-[#c6f26d]" /> CAD
-                estimates
               </div>
             </div>
             <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-[#304036] bg-[#304036] sm:grid-cols-5">
