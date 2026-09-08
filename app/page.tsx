@@ -1,11 +1,22 @@
 "use client";
 
-import { startTransition, useEffect, useMemo, useState } from "react";
+import {
+  startTransition,
+  forwardRef,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { toPng } from "html-to-image";
 import {
   ArrowDownRight,
   ArrowUpRight,
   Check,
   ChevronDown,
+  Download,
+  FileImage,
+  FileText,
   Pencil,
   Plus,
   RotateCcw,
@@ -53,11 +64,12 @@ function annualize(item: RecurringItem) {
 }
 
 function formatMoney(amount: number, compact = false) {
-  return new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: "CAD",
+  const sign = amount < 0 ? "-" : "";
+  const value = new Intl.NumberFormat("en-US", {
     maximumFractionDigits: compact ? 0 : 2,
-  }).format(amount);
+    minimumFractionDigits: compact ? 0 : 2,
+  }).format(Math.abs(amount));
+  return `${sign}$${value}`;
 }
 
 function frequencyLabel(frequency: Frequency) {
@@ -103,6 +115,8 @@ export default function Home() {
   const [editingItem, setEditingItem] = useState<RecurringItem | null>(null);
   const [editorMode, setEditorMode] = useState<EditorMode | null>(null);
   const [showReset, setShowReset] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -198,9 +212,33 @@ export default function Home() {
     setShowReset(false);
   }
 
+  function printSummary() {
+    setShowExportMenu(false);
+    window.print();
+  }
+
+  async function downloadSummaryImage() {
+    if (!exportRef.current) return;
+    setShowExportMenu(false);
+    const dataUrl = await toPng(exportRef.current, {
+      backgroundColor: "#111412",
+      cacheBust: true,
+      pixelRatio: 2,
+      style: {
+        left: "0",
+        position: "fixed",
+        top: "0",
+      },
+    });
+    const link = document.createElement("a");
+    link.download = `leftover-summary-${new Date().toISOString().slice(0, 10)}.png`;
+    link.href = dataUrl;
+    link.click();
+  }
+
   return (
     <main className="min-h-screen overflow-hidden bg-[#111412] text-[#f2f4ef]">
-      <div className="mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-10 lg:px-12">
+      <div className="app-shell mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-10 lg:px-12">
         <header className="mb-10 flex items-center justify-between sm:mb-14">
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-xl bg-[#c6f26d] text-[#162016] shadow-[0_0_30px_rgba(198,242,109,0.12)]">
@@ -215,14 +253,53 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <button
-            className="icon-button"
-            onClick={() => setShowReset(true)}
-            title="Reset all budget data"
-            aria-label="Reset all budget data"
-          >
-            <RotateCcw size={17} />
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button
+                className="icon-button"
+                onClick={() => setShowExportMenu((current) => !current)}
+                title="Export budget summary"
+                aria-label="Export budget summary"
+                aria-expanded={showExportMenu}
+              >
+                <Download size={17} />
+              </button>
+              {showExportMenu && (
+                <div className="export-menu" role="menu">
+                  <button
+                    className="export-menu-item"
+                    onClick={printSummary}
+                    role="menuitem"
+                  >
+                    <FileText size={16} />
+                    <span>
+                      <strong>Print / save PDF</strong>
+                      <small>Open your browser print dialog</small>
+                    </span>
+                  </button>
+                  <button
+                    className="export-menu-item"
+                    onClick={downloadSummaryImage}
+                    role="menuitem"
+                  >
+                    <FileImage size={16} />
+                    <span>
+                      <strong>Download image</strong>
+                      <small>Save a visual PNG summary</small>
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+            <button
+              className="icon-button"
+              onClick={() => setShowReset(true)}
+              title="Reset all budget data"
+              aria-label="Reset all budget data"
+            >
+              <RotateCcw size={17} />
+            </button>
+          </div>
         </header>
 
         <section className="relative mb-10 overflow-hidden rounded-3xl border border-[#304036] bg-[#182019] px-6 py-8 sm:px-10 sm:py-10">
@@ -331,6 +408,13 @@ export default function Home() {
         </footer>
       </div>
 
+      <ExportSummary
+        ref={exportRef}
+        budget={budget}
+        totals={totals}
+        periods={periods}
+      />
+
       {activeEditor && editingItem && (
         <EditorDialog
           type={activeEditor}
@@ -352,6 +436,126 @@ export default function Home() {
         />
       )}
     </main>
+  );
+}
+
+const ExportSummary = forwardRef<
+  HTMLDivElement,
+  {
+    budget: Budget;
+    totals: {
+      annualIncome: number;
+      annualExpenses: number;
+      annualContributions: number;
+      discretionary: number;
+    };
+    periods: readonly (readonly [string, number])[];
+  }
+>(({ budget, totals, periods }, ref) => (
+  <div ref={ref} className="export-sheet" aria-hidden="true">
+    <div className="export-header">
+      <div>
+        <p className="export-kicker">Leftover</p>
+        <p className="export-muted">Your spending room</p>
+      </div>
+      <p className="export-muted">
+        Budget summary · {new Date().toLocaleDateString()}
+      </p>
+    </div>
+    <div className="export-hero">
+      <p className="export-muted">Estimated discretionary money</p>
+      <p
+        className={`export-hero-amount ${totals.discretionary < 0 ? "negative" : ""}`}
+      >
+        {formatMoney(totals.discretionary / 52, true)} <span>per week</span>
+      </p>
+      <div className="export-periods">
+        {periods.map(([label, amount]) => (
+          <div key={label}>
+            <p>{label}</p>
+            <strong>{formatMoney(amount, true)}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div className="export-breakdown">
+      <h2>Annual overview</h2>
+      <div className="export-breakdown-grid">
+        <ExportMetric label="Total income" amount={totals.annualIncome} />
+        <ExportMetric
+          label="Recurring expenses"
+          amount={totals.annualExpenses}
+        />
+        <ExportMetric
+          label="Savings & investments"
+          amount={totals.annualContributions}
+        />
+        <ExportMetric
+          label="Discretionary"
+          amount={totals.discretionary}
+          negative={totals.discretionary < 0}
+        />
+      </div>
+    </div>
+    <div className="export-items">
+      <ExportItemGroup title="Income" items={budget.income} />
+      <ExportItemGroup title="Recurring expenses" items={budget.expenses} />
+      <ExportItemGroup
+        title="Savings & investments"
+        items={budget.contributions}
+      />
+    </div>
+    <p className="export-footer">
+      Generated locally by Leftover. Your budget data stays in this browser.
+    </p>
+  </div>
+));
+
+ExportSummary.displayName = "ExportSummary";
+
+function ExportMetric({
+  label,
+  amount,
+  negative = false,
+}: {
+  label: string;
+  amount: number;
+  negative?: boolean;
+}) {
+  return (
+    <div>
+      <p>{label}</p>
+      <strong className={negative ? "negative" : ""}>
+        {formatMoney(amount)}
+      </strong>
+    </div>
+  );
+}
+
+function ExportItemGroup({
+  title,
+  items,
+}: {
+  title: string;
+  items: RecurringItem[];
+}) {
+  return (
+    <section>
+      <h3>{title}</h3>
+      {items.length === 0 ? (
+        <p className="export-empty">No entries</p>
+      ) : (
+        items.map((item) => (
+          <div className="export-item" key={item.id}>
+            <span>
+              {item.name}
+              <small>{frequencyLabel(item.frequency)}</small>
+            </span>
+            <strong>{formatMoney(item.amount)}</strong>
+          </div>
+        ))
+      )}
+    </section>
   );
 }
 
