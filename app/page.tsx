@@ -18,6 +18,7 @@ import {
 
 type Frequency = "weekly" | "biweekly" | "monthly" | "annual";
 type SectionType = "income" | "expenses" | "contributions";
+type EditorMode = "add" | "edit";
 
 type RecurringItem = {
   id: string;
@@ -101,6 +102,7 @@ export default function Home() {
   const [isReady, setIsReady] = useState(false);
   const [activeEditor, setActiveEditor] = useState<SectionType | null>(null);
   const [editingItem, setEditingItem] = useState<RecurringItem | null>(null);
+  const [editorMode, setEditorMode] = useState<EditorMode | null>(null);
   const [showReset, setShowReset] = useState(false);
 
   useEffect(() => {
@@ -148,11 +150,13 @@ export default function Home() {
   function openAdd(type: SectionType) {
     setActiveEditor(type);
     setEditingItem(createItem());
+    setEditorMode("add");
   }
 
   function openEdit(type: SectionType, item: RecurringItem) {
     setActiveEditor(type);
     setEditingItem(item);
+    setEditorMode("edit");
   }
 
   function saveItem() {
@@ -180,6 +184,7 @@ export default function Home() {
     }));
     setActiveEditor(null);
     setEditingItem(null);
+    setEditorMode(null);
   }
 
   function deleteItem(type: SectionType, id: string) {
@@ -339,8 +344,10 @@ export default function Home() {
           onClose={() => {
             setActiveEditor(null);
             setEditingItem(null);
+            setEditorMode(null);
           }}
           onSave={saveItem}
+          mode={editorMode ?? "add"}
         />
       )}
       {showReset && (
@@ -487,12 +494,14 @@ function ItemRow({
 function EditorDialog({
   type,
   item,
+  mode,
   onChange,
   onClose,
   onSave,
 }: {
   type: SectionType;
   item: RecurringItem;
+  mode: EditorMode;
   onChange: (item: RecurringItem) => void;
   onClose: () => void;
   onSave: () => void;
@@ -515,7 +524,9 @@ function EditorDialog({
       >
         <div className="mb-6 flex items-start justify-between">
           <div>
-            <p className="eyebrow">{item.name ? "Edit item" : "New item"}</p>
+            <p className="eyebrow">
+              {mode === "edit" ? "Edit item" : "New item"}
+            </p>
             <h2 id="editor-title" className="mt-1 text-xl font-semibold">
               {config.title}
             </h2>
