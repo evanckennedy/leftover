@@ -82,14 +82,14 @@ function getSectionConfig(type: SectionType) {
     expenses: {
       title: "Recurring expenses",
       description: "The bills and commitments you can count on.",
-      empty: "Add rent, subscriptions, bills, and other essentials.",
+      empty: "Add your recurring bills and other regular expenses.",
       add: "Add expense",
       tone: "orange",
     },
     contributions: {
       title: "Savings & investments",
       description: "Contributions that build your future.",
-      empty: "Add TFSA contributions, Bitcoin purchases, or other savings.",
+      empty: "Add your recurring savings or investment contributions.",
       add: "Add contribution",
       tone: "blue",
     },
