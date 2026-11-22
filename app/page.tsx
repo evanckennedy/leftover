@@ -15,6 +15,7 @@ import {
   Clipboard,
   Check,
   ChevronDown,
+  CircleHelp,
   Download,
   FileJson,
   FileImage,
@@ -285,6 +286,7 @@ export default function Home() {
   const [editingItem, setEditingItem] = useState<RecurringItem | null>(null);
   const [editorMode, setEditorMode] = useState<EditorMode | null>(null);
   const [showReset, setShowReset] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [pendingImport, setPendingImport] = useState<Budget | null>(null);
   const [pendingImportName, setPendingImportName] = useState("");
@@ -679,6 +681,14 @@ export default function Home() {
             >
               <RotateCcw size={17} />
             </button>
+            <button
+              className="icon-button"
+              onClick={() => setShowHelp(true)}
+              title="Help and how to use Leftover"
+              aria-label="Help and how to use Leftover"
+            >
+              <CircleHelp size={17} />
+            </button>
           </div>
         </header>
 
@@ -832,6 +842,7 @@ export default function Home() {
           onConfirm={resetBudget}
         />
       )}
+      {showHelp && <HelpDialog onClose={() => setShowHelp(false)} />}
       {pendingImport && (
         <ImportDialog
           fileName={pendingImportName}
@@ -1260,6 +1271,105 @@ function ImportDialog({
           <button className="primary-button" onClick={onConfirm}>
             Import budget
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HelpDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="modal-panel max-h-[85vh] max-w-2xl overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="help-title"
+      >
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <p className="eyebrow">A quick guide</p>
+            <h2 id="help-title" className="mt-1 text-xl font-semibold">
+              How to use Leftover
+            </h2>
+          </div>
+          <button
+            className="icon-button shrink-0"
+            onClick={onClose}
+            aria-label="Close help"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="grid gap-5 text-sm leading-6 text-[#aeb9ad] sm:grid-cols-2">
+          <section>
+            <h3 className="mb-1 font-semibold text-[#e7eee3]">
+              Get started
+            </h3>
+            <p>
+              Add your recurring income, bills, and savings or investment
+              contributions. Enter each amount and how often it happens.
+            </p>
+          </section>
+          <section>
+            <h3 className="mb-1 font-semibold text-[#e7eee3]">
+              What the estimate means
+            </h3>
+            <p>
+              Leftover converts entries to annual amounts, then subtracts
+              expenses and contributions from income. The result is estimated
+              spending room—not a full financial plan—and does not account for
+              taxes or one-time costs.
+            </p>
+          </section>
+          <section>
+            <h3 className="mb-1 font-semibold text-[#e7eee3]">
+              How frequencies convert
+            </h3>
+            <p>
+              Weekly amounts are multiplied by 52, every-two-week amounts by 26,
+              monthly amounts by 12, and annual amounts by 1. Period estimates
+              are based on the annual total.
+            </p>
+          </section>
+          <section>
+            <h3 className="mb-1 font-semibold text-[#e7eee3]">
+              Your data stays here
+            </h3>
+            <p>
+              Your budget is saved in this browser on this device. There is no
+              account or server-side budget sync. Use the JSON backup option to
+              keep a copy before switching browsers or devices.
+            </p>
+          </section>
+          <section>
+            <h3 className="mb-1 font-semibold text-[#e7eee3]">
+              Export and restore
+            </h3>
+            <p>
+              Download a text summary, copy it to your notes, export entries as
+              CSV for a spreadsheet, or save a PNG/PDF summary. Importing CSV or
+              JSON replaces the budget currently saved in this browser after
+              confirmation.
+            </p>
+          </section>
+          <section>
+            <h3 className="mb-1 font-semibold text-[#e7eee3]">
+              Use it like an app
+            </h3>
+            <p>
+              On a supported mobile browser, use its menu to add Leftover to
+              your home screen. Your budget remains stored in that browser on
+              that device.
+            </p>
+          </section>
         </div>
       </div>
     </div>
