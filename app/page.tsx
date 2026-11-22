@@ -12,16 +12,20 @@ import { toPng } from "html-to-image";
 import {
   ArrowDownRight,
   ArrowUpRight,
+  Clipboard,
   Check,
   ChevronDown,
   Download,
+  FileJson,
   FileImage,
   FileText,
+  FileSpreadsheet,
   Pencil,
   Plus,
   RotateCcw,
   Trash2,
   TrendingUp,
+  Upload,
   Wallet,
   X,
 } from "lucide-react";
@@ -51,6 +55,11 @@ const FREQUENCIES: { value: Frequency; label: string }[] = [
   { value: "annual", label: "Annually" },
 ];
 const emptyBudget: Budget = { income: [], expenses: [], contributions: [] };
+const SECTION_LABELS: Record<SectionType, string> = {
+  income: "Income",
+  expenses: "Recurring expenses",
+  contributions: "Savings & investments",
+};
 
 const frequencyMultiplier: Record<Frequency, number> = {
   weekly: 52,
@@ -72,6 +81,13 @@ function formatMoney(amount: number, compact = false) {
   return `${sign}$${value}`;
 }
 
+function getLocalDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function frequencyLabel(frequency: Frequency) {
   return (
     FREQUENCIES.find((item) => item.value === frequency)?.label ?? frequency
@@ -80,6 +96,160 @@ function frequencyLabel(frequency: Frequency) {
 
 function createItem(): RecurringItem {
   return { id: crypto.randomUUID(), name: "", amount: 0, frequency: "monthly" };
+}
+
+function csvEscape(value: string | number) {
+  const text = String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadFile(contents: string, filename: string, mimeType: string) {
+  const blob = new Blob([contents], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = url;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function formatBudgetText(
+  budget: Budget,
+  totals: {
+    annualIncome: number;
+    annualExpenses: number;
+    annualContributions: number;
+    discretionary: number;
+  },
+) {
+  const date = getLocalDateKey();
+  const sections = (["income", "expenses", "contributions"] as SectionType[])
+    .map((type) => {
+      const entries =
+        budget[type].length === 0
+          ? "  (No entries)"
+          : budget[type]
+              .map(
+                (item) =>
+                  `  ${item.name}: ${formatMoney(item.amount)} / ${frequencyLabel(item.frequency)}`,
+              )
+              .join("\n");
+      return `${SECTION_LABELS[type].toUpperCase()}\n${entries}`;
+    })
+    .join("\n\n");
+
+  return `Leftover Budget - ${date}
+
+${sections}
+
+SUMMARY
+  Annual income: ${formatMoney(totals.annualIncome)}
+  Recurring expenses: ${formatMoney(totals.annualExpenses)}
+  Savings & investments: ${formatMoney(totals.annualContributions)}
+  Discretionary: ${formatMoney(totals.discretionary)}
+`;
+}
+
+function formatBudgetCsv(budget: Budget) {
+  const rows = [
+    ["Section", "Name", "Amount", "Frequency"],
+    ...(["income", "expenses", "contributions"] as SectionType[]).flatMap(
+      (type) =>
+        budget[type].map((item) => [
+          type,
+          item.name,
+          item.amount,
+          item.frequency,
+        ]),
+    ),
+  ];
+  return rows.map((row) => row.map(csvEscape).join(",")).join("\r\n");
+}
+
+function parseCsvRows(contents: string) {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+
+  for (let index = 0; index < contents.length; index += 1) {
+    const char = contents[index];
+    if (char === '"') {
+      if (quoted && contents[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === "," && !quoted) {
+      row.push(field);
+      field = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && contents[index + 1] === "\n") index += 1;
+      row.push(field);
+      if (row.some((value) => value.length > 0)) rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += char;
+    }
+  }
+  row.push(field);
+  if (row.some((value) => value.length > 0)) rows.push(row);
+  return rows;
+}
+
+function isFrequency(value: unknown): value is Frequency {
+  return (
+    value === "weekly" ||
+    value === "biweekly" ||
+    value === "monthly" ||
+    value === "annual"
+  );
+}
+
+function normalizeItem(value: unknown): RecurringItem | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Partial<RecurringItem>;
+  if (
+    typeof item.name !== "string" ||
+    !item.name.trim() ||
+    typeof item.amount !== "number" ||
+    !Number.isFinite(item.amount) ||
+    item.amount <= 0 ||
+    !isFrequency(item.frequency)
+  ) {
+    return null;
+  }
+  return {
+    id:
+      typeof item.id === "string" && item.id
+        ? item.id
+        : crypto.randomUUID(),
+    name: item.name.trim(),
+    amount: item.amount,
+    frequency: item.frequency,
+  };
+}
+
+function validateBudget(value: unknown): Budget | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<Budget>;
+  const sections: SectionType[] = ["income", "expenses", "contributions"];
+  const budget: Budget = { income: [], expenses: [], contributions: [] };
+
+  for (const section of sections) {
+    const entries = candidate[section];
+    if (!Array.isArray(entries)) return null;
+    const normalized: RecurringItem[] = [];
+    for (const entry of entries) {
+      const item = normalizeItem(entry);
+      if (!item) return null;
+      normalized.push(item);
+    }
+    budget[section] = normalized;
+  }
+  return budget;
 }
 
 function getSectionConfig(type: SectionType) {
@@ -116,7 +286,12 @@ export default function Home() {
   const [editorMode, setEditorMode] = useState<EditorMode | null>(null);
   const [showReset, setShowReset] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [pendingImport, setPendingImport] = useState<Budget | null>(null);
+  const [pendingImportName, setPendingImportName] = useState("");
+  const [notice, setNotice] = useState("");
+  const importRef = useRef<HTMLInputElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -134,6 +309,28 @@ export default function Home() {
     if (isReady)
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(budget));
   }, [budget, isReady]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timeout = window.setTimeout(() => setNotice(""), 3200);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
+
+  useEffect(() => {
+    if (!showExportMenu) return;
+
+    function closeExportMenu(event: PointerEvent) {
+      if (
+        exportMenuRef.current &&
+        !exportMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowExportMenu(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", closeExportMenu);
+    return () => document.removeEventListener("pointerdown", closeExportMenu);
+  }, [showExportMenu]);
 
   const totals = useMemo(() => {
     const annualIncome = budget.income.reduce(
@@ -212,28 +409,151 @@ export default function Home() {
     setShowReset(false);
   }
 
+  function downloadTextSummary() {
+    setShowExportMenu(false);
+    downloadFile(
+      formatBudgetText(budget, totals),
+      `leftover-budget-${getLocalDateKey()}.txt`,
+      "text/plain;charset=utf-8",
+    );
+  }
+
+  function downloadCsvSummary() {
+    setShowExportMenu(false);
+    downloadFile(
+      formatBudgetCsv(budget),
+      `leftover-budget-${getLocalDateKey()}.csv`,
+      "text/csv;charset=utf-8",
+    );
+  }
+
+  function downloadJsonBackup() {
+    setShowExportMenu(false);
+    downloadFile(
+      JSON.stringify({ version: 1, budget }, null, 2),
+      `leftover-backup-${getLocalDateKey()}.json`,
+      "application/json;charset=utf-8",
+    );
+  }
+
+  async function copyTextSummary() {
+    setShowExportMenu(false);
+    try {
+      await navigator.clipboard.writeText(formatBudgetText(budget, totals));
+      setNotice("Budget summary copied to your clipboard.");
+    } catch {
+      setNotice("Could not access the clipboard.");
+    }
+  }
+
+  async function importBudgetFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setShowExportMenu(false);
+
+    try {
+      const contents = await file.text();
+      let importedBudget: Budget | null = null;
+
+      if (file.name.toLowerCase().endsWith(".json")) {
+        const parsed = JSON.parse(contents) as {
+          budget?: unknown;
+        };
+        importedBudget = validateBudget(parsed.budget ?? parsed);
+      } else if (file.name.toLowerCase().endsWith(".csv")) {
+        const rows = parseCsvRows(contents);
+        if (rows.length < 2) throw new Error("The CSV file has no entries.");
+        const headers = rows[0].map((header) => header.trim().toLowerCase());
+        const sectionIndex = headers.indexOf("section");
+        const nameIndex = headers.indexOf("name");
+        const amountIndex = headers.indexOf("amount");
+        const frequencyIndex = headers.indexOf("frequency");
+        if (
+          sectionIndex < 0 ||
+          nameIndex < 0 ||
+          amountIndex < 0 ||
+          frequencyIndex < 0
+        ) {
+          throw new Error("The CSV headers are not recognized.");
+        }
+
+        const candidate: Budget = {
+          income: [],
+          expenses: [],
+          contributions: [],
+        };
+        for (const row of rows.slice(1)) {
+          const section = row[sectionIndex]?.trim();
+          if (!["income", "expenses", "contributions"].includes(section)) {
+            throw new Error(`Unknown CSV section: ${section || "(empty)"}.`);
+          }
+          const frequency = row[frequencyIndex]?.trim();
+          if (!isFrequency(frequency)) {
+            throw new Error(`Unknown frequency: ${frequency || "(empty)"}.`);
+          }
+          const amount = Number(row[amountIndex]);
+          const item = normalizeItem({
+            name: row[nameIndex],
+            amount,
+            frequency,
+          });
+          if (!item) throw new Error("A CSV entry has invalid data.");
+          candidate[section as SectionType].push(item);
+        }
+        importedBudget = validateBudget(candidate);
+      } else {
+        throw new Error("Choose a .json or .csv file.");
+      }
+
+      if (!importedBudget) throw new Error("The file contains invalid budget data.");
+      setPendingImport(importedBudget);
+      setPendingImportName(file.name);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Could not import that file.",
+      );
+    }
+  }
+
+  function confirmImport() {
+    if (!pendingImport) return;
+    setBudget(pendingImport);
+    setPendingImport(null);
+    setPendingImportName("");
+    setNotice("Budget imported successfully.");
+  }
+
   function printSummary() {
     setShowExportMenu(false);
     window.print();
   }
 
   async function downloadSummaryImage() {
-    if (!exportRef.current) return;
+    const exportNode = exportRef.current;
+    if (!exportNode) return;
     setShowExportMenu(false);
-    const dataUrl = await toPng(exportRef.current, {
-      backgroundColor: "#111412",
-      cacheBust: true,
-      pixelRatio: 2,
-      style: {
-        left: "0",
-        position: "fixed",
-        top: "0",
-      },
-    });
-    const link = document.createElement("a");
-    link.download = `leftover-summary-${new Date().toISOString().slice(0, 10)}.png`;
-    link.href = dataUrl;
-    link.click();
+    try {
+      await document.fonts.ready;
+      const dataUrl = await toPng(exportNode, {
+        backgroundColor: "#111412",
+        cacheBust: true,
+        height: exportNode.scrollHeight,
+        pixelRatio: 2,
+        style: {
+          left: "auto",
+          position: "static",
+          top: "auto",
+        },
+        width: exportNode.scrollWidth,
+      });
+      const link = document.createElement("a");
+      link.download = `leftover-summary-${getLocalDateKey()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch {
+      setNotice("Could not create the PNG summary. Please try again.");
+    }
   }
 
   return (
@@ -254,7 +574,15 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative">
+            <button
+              className="icon-button"
+              onClick={() => importRef.current?.click()}
+              title="Import CSV or JSON"
+              aria-label="Import CSV or JSON"
+            >
+              <Upload size={17} />
+            </button>
+            <div className="relative" ref={exportMenuRef}>
               <button
                 className="icon-button"
                 onClick={() => setShowExportMenu((current) => !current)}
@@ -288,6 +616,50 @@ export default function Home() {
                       <small>Save a visual PNG summary</small>
                     </span>
                   </button>
+                  <button
+                    className="export-menu-item"
+                    onClick={downloadTextSummary}
+                    role="menuitem"
+                  >
+                    <FileText size={16} />
+                    <span>
+                      <strong>Download text</strong>
+                      <small>Save all entries as a notes-friendly TXT file</small>
+                    </span>
+                  </button>
+                  <button
+                    className="export-menu-item"
+                    onClick={copyTextSummary}
+                    role="menuitem"
+                  >
+                    <Clipboard size={16} />
+                    <span>
+                      <strong>Copy text</strong>
+                      <small>Copy the budget summary to your clipboard</small>
+                    </span>
+                  </button>
+                  <button
+                    className="export-menu-item"
+                    onClick={downloadCsvSummary}
+                    role="menuitem"
+                  >
+                    <FileSpreadsheet size={16} />
+                    <span>
+                      <strong>Download CSV</strong>
+                      <small>Open entries in a spreadsheet</small>
+                    </span>
+                  </button>
+                  <button
+                    className="export-menu-item"
+                    onClick={downloadJsonBackup}
+                    role="menuitem"
+                  >
+                    <FileJson size={16} />
+                    <span>
+                      <strong>Download JSON backup</strong>
+                      <small>Save a complete data backup</small>
+                    </span>
+                  </button>
                 </div>
               )}
             </div>
@@ -301,6 +673,23 @@ export default function Home() {
             </button>
           </div>
         </header>
+
+        <input
+          ref={importRef}
+          className="hidden"
+          type="file"
+          accept=".csv,.json,text/csv,application/json"
+          onChange={importBudgetFile}
+        />
+
+        {notice && (
+          <div
+            className="mb-4 rounded-xl border border-[#3a4a3d] bg-[#182019] px-4 py-3 text-sm text-[#d5dfd2]"
+            role="status"
+          >
+            {notice}
+          </div>
+        )}
 
         <section className="relative mb-10 overflow-hidden rounded-3xl border border-[#304036] bg-[#182019] px-6 py-8 sm:px-10 sm:py-10">
           <div className="absolute -right-20 -top-24 size-72 rounded-full border-28 border-[#283a2a]/50" />
@@ -435,6 +824,16 @@ export default function Home() {
           onConfirm={resetBudget}
         />
       )}
+      {pendingImport && (
+        <ImportDialog
+          fileName={pendingImportName}
+          onClose={() => {
+            setPendingImport(null);
+            setPendingImportName("");
+          }}
+          onConfirm={confirmImport}
+        />
+      )}
     </main>
   );
 }
@@ -459,7 +858,7 @@ const ExportSummary = forwardRef<
         <p className="export-muted">Your spending room</p>
       </div>
       <p className="export-muted">
-        Budget summary · {new Date().toLocaleDateString()}
+        Budget summary
       </p>
     </div>
     <div className="export-hero">
@@ -805,6 +1204,53 @@ function EditorDialog({
             onClick={onSave}
           >
             <Check size={16} /> Save item
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ImportDialog({
+  fileName,
+  onClose,
+  onConfirm,
+}: {
+  fileName: string;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="modal-panel max-w-md"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="import-title"
+      >
+        <div className="mb-5 grid size-10 place-items-center rounded-xl bg-[#263725] text-[#c6f26d]">
+          <Upload size={19} />
+        </div>
+        <h2 id="import-title" className="text-xl font-semibold">
+          Import budget data?
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-[#96a197]">
+          <strong className="font-semibold text-[#d5dfd2]">{fileName}</strong>{" "}
+          will replace the income, expenses, and savings entries currently saved
+          in this browser.
+        </p>
+        <div className="mt-8 flex justify-end gap-3">
+          <button className="secondary-button" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="primary-button" onClick={onConfirm}>
+            Import budget
           </button>
         </div>
       </div>

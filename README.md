@@ -10,6 +10,9 @@ Leftover is a simple personal budgeting app that estimates how much recurring in
 - Choose weekly, biweekly, monthly, or annual frequencies.
 - View estimated discretionary money per day, week, two weeks, month, and year.
 - Export a budget summary as a PDF or PNG image.
+- Download a notes-friendly text summary or copy it to the clipboard.
+- Download budget entries as CSV or save a complete JSON backup.
+- Import CSV or JSON budget data with confirmation before replacing saved entries.
 - Persist budget data in the browser with `localStorage`.
 - Reset all saved budget data with confirmation.
 
