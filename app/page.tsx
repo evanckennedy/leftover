@@ -311,6 +311,14 @@ export default function Home() {
   }, [budget, isReady]);
 
   useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        setNotice("Could not enable offline app support.");
+      });
+    }
+  }, []);
+
+  useEffect(() => {
     if (!notice) return;
     const timeout = window.setTimeout(() => setNotice(""), 3200);
     return () => window.clearTimeout(timeout);
